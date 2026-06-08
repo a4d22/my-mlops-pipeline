@@ -110,9 +110,10 @@ jobs:
               sudo ./aws/install --update
               rm -rf awscliv2.zip ./aws
             fi
-
-            # Use the AWS CLI on the server to dynamically fetch the account registry URI
-            ECR_REGISTRY=$(aws ecr describe-registry --region $AWS_REGION --query 'registries[0].registryId' --output text).dkr.ecr.$AWS_REGION.amazonaws.com
+            
+            # 1. UNIVERSAL FIX: Fetch the 12-digit account string using token identity metrics
+            ACCOUNT_ID=$(aws sts get-caller-identity --query "Account" --output text)
+            ECR_REGISTRY="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
             # Log in to ECR using variables dynamically
             aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY
