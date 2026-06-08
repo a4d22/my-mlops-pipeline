@@ -112,7 +112,7 @@ jobs:
             fi
 
             # Use the AWS CLI on the server to dynamically fetch the account registry URI
-            ECR_REGISTRY=$(aws ecr describe-registries --region $AWS_REGION --query 'registries[0].registryId' --output text).dkr.ecr.$AWS_REGION.amazonaws.com
+            ECR_REGISTRY=$(aws ecr describe-registry --region $AWS_REGION --query 'registries[0].registryId' --output text).dkr.ecr.$AWS_REGION.amazonaws.com
 
             # Log in to ECR using variables dynamically
             aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY
