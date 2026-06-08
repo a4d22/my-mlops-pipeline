@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: housing-predict-service
+  IMAGE_TAG: latest
+
 jobs:
   # --- STAGE 1: CONTINUOUS INTEGRATION (CI) ---
   code-quality-and-testing:
@@ -42,7 +47,7 @@ jobs:
         run: |
           pytest -v
   
-  # --- STAGE 2: CONTINUOUS DELIVERY (CD) ---
+  # --- STAGE 2: CONTINUOUS DELIVERY (CD) --- BUILD & PUSH ---
   build-and-ship-to-ecr:
     runs-on: ubuntu-latest
     # CRITICAL: This job will only run if the test stage passes flawlessly!
@@ -77,3 +82,42 @@ jobs:
 
           # Push the container to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+  # --- STAGE 3: CONTINUOUS DEPLOYMENT (CD) - SERVER UPDATE ---
+  deploy-to-ec2:
+    runs-on: ubuntu-latest
+    # CRITICAL: Run only after the new image is safely pushed to ECR
+    needs: build-and-ship-to-ecr
+    steps:
+      # Use a verified community tool to handle the complex secure SSH commands seamlessly
+      - name: Execute Remote SSH Commands on EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_PUBLIC_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: AWS_REGION, ECR_REPOSITORY, IMAGE_TAG
+
+          script: |
+            # 1. Update system configurations and install AWS CLI inside the server if missing
+            sudo apt-get update -y && sudo apt-get install awscli -y
+
+            # Use the AWS CLI on the server to dynamically fetch the account registry URI
+            ECR_REGISTRY=$(aws ecr describe-registries --region $AWS_REGION --query 'registries[0].registryId' --output text).dkr.ecr.$AWS_REGION.amazonaws.com
+
+            # Log in to ECR using variables dynamically
+            aws ecr get-login-password --region $AWS_REGION | sudo docker login --username AWS --password-stdin $ECR_REGISTRY
+
+            # Pull down the fresh image layer using variables dynamically
+            sudo docker pull $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+            # Stop and remove the old running container cleanly
+            sudo docker rm -f live-housing-api || true
+
+            # Spin up the brand-new model container
+            sudo docker run -d \
+              --name live-housing-api \
+              -p 80:80 \
+              $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+
