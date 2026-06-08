@@ -7,6 +7,7 @@ on:
     branches: [ main ]
 
 jobs:
+  # --- STAGE 1: CONTINUOUS INTEGRATION (CI) ---
   code-quality-and-testing:
     runs-on: ubuntu-latest
 
@@ -40,3 +41,39 @@ jobs:
       - name: Run Automated Test
         run: |
           pytest -v
+  
+  # --- STAGE 2: CONTINUOUS DELIVERY (CD) ---
+  build-and-ship-to-ecr:
+    runs-on: ubuntu-latest
+    # CRITICAL: This job will only run if the test stage passes flawlessly!
+    needs: code-quality-and-testing
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+      
+      # Step 1: Authenticate with AWS using our hidden GitHub Secrets
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      # Step 2: Automatically log our remote runner into AWS ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      # Step 3: Build the production container image and push it to ECR
+      - name: Build and Push Docker Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: housing-predict-service
+          IMAGE_TAG: latest
+        run: |
+          # Build the container exactly like we did locally
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+
+          # Push the container to ECR
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
