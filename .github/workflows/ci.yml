@@ -100,7 +100,16 @@ jobs:
 
           script: |
             # 1. Update system configurations and install AWS CLI inside the server if missing
-            sudo apt-get update -y && sudo apt-get install awscli -y
+            sudo apt-get update -y && sudo apt-get install -y unzip
+
+            # 2. Download and install official AWS CLI v2 if 'aws' command doesn't exist
+            if ! command -v aws &> /dev/null; then
+              echo "AWS CLI not found. Installing official AWS CLI v2..."
+              curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+              unzip -q awscliv2.zip
+              sudo ./aws/install --update
+              rm -rf awscliv2.zip ./aws
+            fi
 
             # Use the AWS CLI on the server to dynamically fetch the account registry URI
             ECR_REGISTRY=$(aws ecr describe-registries --region $AWS_REGION --query 'registries[0].registryId' --output text).dkr.ecr.$AWS_REGION.amazonaws.com
