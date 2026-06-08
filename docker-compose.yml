@@ -1,0 +1,10 @@
+version: '3.8'
+
+services:
+  training-pipeline:
+    build: .
+    container_name: local_mlops_pipeline
+    volumes:
+      - .:/app
+    environment:
+      - ENVIRONMENT=local

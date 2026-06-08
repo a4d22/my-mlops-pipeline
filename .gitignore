@@ -1,0 +1,22 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Docker configurations
+.dockerignore
+
+# Machine Learning artifacts (DO NOT COMMIT THESE)
+*.pkl
+*.h5
+*.pt
+*.pth
+*.joblib
+data/
